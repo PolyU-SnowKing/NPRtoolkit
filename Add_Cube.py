@@ -4,7 +4,7 @@ bl_info = {
     "version": (1, 0),
     "blender": (2, 80, 0),
     "location": "View3D > Sidebar > NPRtoolkit",
-    "description": "Adds a new Mesh Object",
+    "description": "Adds a new Mesh Object and logs 'test'",
     "warning": "",
     "doc_url": "",
     "category": "Add Mesh",
@@ -51,6 +51,17 @@ class OBJECT_OT_add_object(Operator, AddObjectHelper):
         add_object(self, context)
         return {'FINISHED'}
 
+class OBJECT_OT_log_test(Operator):
+    """Log 'test' to the console"""
+    bl_idname = "object.log_test"
+    bl_label = "Log Test"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        self.report({'INFO'}, "test")
+        print("test")
+        return {'FINISHED'}
+
 class VIEW3D_PT_NPRtoolkit(Panel):
     bl_label = "NPRtoolkit"
     bl_idname = "VIEW3D_PT_NPRtoolkit"
@@ -61,13 +72,16 @@ class VIEW3D_PT_NPRtoolkit(Panel):
     def draw(self, context):
         layout = self.layout
         layout.operator("mesh.add_object")
+        layout.operator("object.log_test")
 
 def register():
     bpy.utils.register_class(OBJECT_OT_add_object)
+    bpy.utils.register_class(OBJECT_OT_log_test)
     bpy.utils.register_class(VIEW3D_PT_NPRtoolkit)
 
 def unregister():
     bpy.utils.unregister_class(OBJECT_OT_add_object)
+    bpy.utils.unregister_class(OBJECT_OT_log_test)
     bpy.utils.unregister_class(VIEW3D_PT_NPRtoolkit)
 
 if __name__ == "__main__":
