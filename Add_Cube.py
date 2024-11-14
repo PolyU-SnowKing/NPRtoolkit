@@ -57,17 +57,22 @@ def add_Outline():
         solidify_modifier.use_flip_normals = True
         solidify_modifier.use_rim = True
 
-def add_Outline():
+
+#######FUNCTION3######
+
+def add_shader():
     for obj in bpy.context.selected_objects:
         bpy.context.view_layer.objects.active = obj
-        bpy.ops.object.modifier_add(type='SOLIDIFY')
-        solidify_modifier = obj.modifiers[-1]
-        solidify_modifier.name = "Outline"
-        solidify_modifier.thickness = 0.1
-        solidify_modifier.offset = 1
-        solidify_modifier.use_flip_normals = True
-        solidify_modifier.use_rim = True
 
+
+######FUNCTION4######
+
+def add_composition():
+    for obj in bpy.context.selected_objects:
+        bpy.context.view_layer.objects.active = obj
+
+
+########UILAYER###########
 
 class OBJECT_OT_add_object(Operator, AddObjectHelper):
     """Create a new Mesh Object"""
@@ -89,9 +94,13 @@ class OBJECT_OT_add_object(Operator, AddObjectHelper):
         return {'FINISHED'}
 
 
-class OBJECT_OT_log_test(Operator):
+import bpy
+from bpy.types import Operator
+
+
+class OBJECT_OT_OUTLINE(Operator):
     """Log 'test' to the console"""
-    bl_idname = "object.log_test"
+    bl_idname = "object.outline"
     bl_label = "Add OutLine"
     bl_options = {'REGISTER', 'UNDO'}
 
@@ -99,6 +108,32 @@ class OBJECT_OT_log_test(Operator):
         self.report({'INFO'}, "test")
         print("Add_OutLine")
         add_Outline()
+        return {'FINISHED'}
+
+
+class OBJECT_OT_SHADER(Operator):
+    '''add a custom shader to object'''
+    bl_idname = "object.shader"
+    bl_label = "Add NPRshader"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        self.report({'INFO'}, "test")
+        print("Add NPRshader")
+        add_shader()
+        return {'FINISHED'}
+
+
+class OBJECT_OT_COMPOSITION(Operator):
+    '''add a COMPOSITION to object'''
+    bl_idname = "object.composition"
+    bl_label = "Add Composition"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        self.report({'INFO'}, "test")
+        print("Add_OutLine")
+        add_composition()
         return {'FINISHED'}
 
 
@@ -112,19 +147,25 @@ class VIEW3D_PT_NPRtoolkit(Panel):
     def draw(self, context):
         layout = self.layout
         layout.operator("mesh.add_object")
-        layout.operator("object.log_test")
+        layout.operator("object.outline")
+        layout.operator("object.shader")
+        layout.operator("object.composition")
 
 
 def register():
     bpy.utils.register_class(OBJECT_OT_add_object)
-    bpy.utils.register_class(OBJECT_OT_log_test)
+    bpy.utils.register_class(OBJECT_OT_OUTLINE)
     bpy.utils.register_class(VIEW3D_PT_NPRtoolkit)
+    bpy.utils.register_class(OBJECT_OT_SHADER)
+    bpy.utils.register_class(OBJECT_OT_COMPOSITION)
 
 
 def unregister():
     bpy.utils.unregister_class(OBJECT_OT_add_object)
-    bpy.utils.unregister_class(OBJECT_OT_log_test)
+    bpy.utils.unregister_class(OBJECT_OT_OUTLINE)
     bpy.utils.unregister_class(VIEW3D_PT_NPRtoolkit)
+    bpy.utils.register_class(OBJECT_OT_SHADER)
+    bpy.utils.register_class(OBJECT_OT_COMPOSITION)
 
 
 if __name__ == "__main__":
