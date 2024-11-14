@@ -15,6 +15,14 @@ from bpy.types import Operator, Panel
 from bpy.props import FloatVectorProperty
 from bpy_extras.object_utils import AddObjectHelper, object_data_add
 from mathutils import Vector
+import os
+
+####设置初始化参数####
+current_dir = os.path.dirname(__file__)
+PRESET_FILE_PATH = os.path.join(current_dir, "file/props.blend")
+
+
+###FUNCTION1######
 
 def add_object(self, context):
     scale_x = self.scale.x
@@ -34,6 +42,33 @@ def add_object(self, context):
     mesh.from_pydata(verts, edges, faces)
     object_data_add(context, mesh, operator=self)
 
+
+######FUNCTION2#######
+
+
+def add_Outline():
+    for obj in bpy.context.selected_objects:
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.modifier_add(type='SOLIDIFY')
+        solidify_modifier = obj.modifiers[-1]
+        solidify_modifier.name = "Outline"
+        solidify_modifier.thickness = 0.1
+        solidify_modifier.offset = 1
+        solidify_modifier.use_flip_normals = True
+        solidify_modifier.use_rim = True
+
+def add_Outline():
+    for obj in bpy.context.selected_objects:
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.modifier_add(type='SOLIDIFY')
+        solidify_modifier = obj.modifiers[-1]
+        solidify_modifier.name = "Outline"
+        solidify_modifier.thickness = 0.1
+        solidify_modifier.offset = 1
+        solidify_modifier.use_flip_normals = True
+        solidify_modifier.use_rim = True
+
+
 class OBJECT_OT_add_object(Operator, AddObjectHelper):
     """Create a new Mesh Object"""
     bl_idname = "mesh.add_object"
@@ -47,20 +82,25 @@ class OBJECT_OT_add_object(Operator, AddObjectHelper):
         description="scaling",
     )
 
+    # Write Function Here
+
     def execute(self, context):
         add_object(self, context)
         return {'FINISHED'}
 
+
 class OBJECT_OT_log_test(Operator):
     """Log 'test' to the console"""
     bl_idname = "object.log_test"
-    bl_label = "Log Test"
+    bl_label = "Add OutLine"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         self.report({'INFO'}, "test")
-        print("test")
+        print("Add_OutLine")
+        add_Outline()
         return {'FINISHED'}
+
 
 class VIEW3D_PT_NPRtoolkit(Panel):
     bl_label = "NPRtoolkit"
@@ -74,15 +114,18 @@ class VIEW3D_PT_NPRtoolkit(Panel):
         layout.operator("mesh.add_object")
         layout.operator("object.log_test")
 
+
 def register():
     bpy.utils.register_class(OBJECT_OT_add_object)
     bpy.utils.register_class(OBJECT_OT_log_test)
     bpy.utils.register_class(VIEW3D_PT_NPRtoolkit)
 
+
 def unregister():
     bpy.utils.unregister_class(OBJECT_OT_add_object)
     bpy.utils.unregister_class(OBJECT_OT_log_test)
     bpy.utils.unregister_class(VIEW3D_PT_NPRtoolkit)
+
 
 if __name__ == "__main__":
     register()
