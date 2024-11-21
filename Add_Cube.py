@@ -19,6 +19,7 @@ import os
 
 ####设置初始化参数####
 current_dir = os.path.dirname(__file__)
+#current_dir = os.getcwd()
 #PRESET_FILE_PATH = os.path.join(current_dir, "file/prop.blend")
 #PRESET_FILE_PATH = os.path.join(current_dir, "D:\Blender_NPRtoolkit\NPRtoolkit\prop.blend")
 PRESET_FILE_PATH = "D:\Blender_NPRtoolkit/NPRtoolkit/prop.blend"
@@ -102,6 +103,66 @@ def add_edge_modifier(obj, node_group_name):
     else:
         print("Vertex group 'inkedge' already exists.")
 
+
+def insert_color_attribute(obj, color_layer_name, color_value):
+    # 确保物体是一个网格对象
+    if obj.type != 'MESH':
+        print("Selected object is not a mesh")
+        return
+
+    mesh = obj.data
+
+    # 检查是否已存在名为 color_layer_name 的颜色层，如果不存在则创建
+    if color_layer_name not in mesh.vertex_colors:
+        color_layer = mesh.vertex_colors.new(name=color_layer_name)
+    else:
+        color_layer = mesh.vertex_colors[color_layer_name]
+
+    # 为颜色层中的每个顶点循环（Loop）设置颜色值
+    for loop_index, loop in enumerate(mesh.loops):
+        color_layer.data[loop_index].color = color_value
+
+
+def insert_shader_node_to_material(obj):
+    # 确保物体有材质槽
+    insert_color_attribute(obj, "mask0", (1.0, 1.0, 1.0, 1.0))
+
+    if not obj.material_slots:
+        obj.data.materials.append(None)
+
+    material = obj.material_slots[0].material
+    if not material or not material.use_nodes:
+        material = bpy.data.materials.new(name="New_Material")
+        obj.material_slots[0].material = material
+
+    material.use_nodes = True
+    nodes = material.node_tree.nodes
+    links = material.node_tree.links
+
+    # 查找 Principled BSDF 和 Image Texture 节点
+    principled = next((node for node in nodes if node.type == 'BSDF_PRINCIPLED'), None)
+    image_tex = next((node for node in nodes if node.type == 'TEX_IMAGE'), None)
+    material_output = next((node for node in nodes if node.type == 'OUTPUT_MATERIAL'), None)
+
+    # 加载节点
+    with bpy.data.libraries.load(PRESET_FILE_PATH, link=False) as (data_from, data_to):
+        if "ShaderNode" in data_from.node_groups:
+            data_to.node_groups = ["ShaderNode"]
+        else:
+            print("ShaderNode group not found in the file.")
+            return None
+
+    # 将 ShadeNode 节点插入到节点树中
+    inktex_node = nodes.new('ShaderNodeGroup')  # 创建一个新的节点组实例
+    inktex_node.node_tree = bpy.data.node_groups.get("inktex", None)
+
+    # 创建连接
+    if principled and image_tex:
+        links.new(image_tex.outputs[0], inktex_node.inputs[0])
+        links.new(inktex_node.outputs[0], material_output.inputs['Surface'])
+    else:
+        links.new(inktex_node.outputs[0], material_output.inputs['Surface'])
+
 ########UILAYER###########
 
 class OBJECT_OT_add_object(Operator, AddObjectHelper):
@@ -170,6 +231,64 @@ class OBJECT_OT_SHADER(Operator):
         add_shader()
         return {'FINISHED'}
 
+class OBJECT_OT_add_shader(bpy.types.Operator):
+    bl_idname = "object.add_shader_node"
+    bl_label = "ShaderNode"
+    bl_description = "Add ShaderNode to Mesh"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        obj = context.active_object
+        if obj and obj.type == 'MESH':
+            insert_shader_node_to_material(obj)
+            return {'FINISHED'}
+        else:
+            self.report({'WARNING'}, "No suitable object selected.")
+            return {'CANCELLED'}
+class OBJECT_OT_load_bg_fx(bpy.types.Operator):
+    bl_idname = "object.load_bg_fx"
+    bl_label = "Pure Background"
+
+    def execute(self, context):
+        # 确保世界使用节点
+        world = context.scene.world
+        if not world.use_nodes:
+            world.use_nodes = True
+
+        # 加载 'bg' 节点组
+        with bpy.data.libraries.load(PRESET_FILE_PATH, link=False) as (data_from, data_to):
+            if "bg" in data_from.node_groups:
+                data_to.node_groups = ["bg"]
+            else:
+                self.report({'WARNING'}, "BG FX node group not found")
+                return {'CANCELLED'}
+
+        # 获取世界材质的节点树并添加 'bg' 节点组
+        tree = world.node_tree
+        bg_node = tree.nodes.new('ShaderNodeGroup')
+        bg_node.node_tree = bpy.data.node_groups['bg']
+
+        # 查找 World Output 节点
+        world_output_node = next((node for node in tree.nodes if node.type == 'OUTPUT_WORLD'), None)
+        if not world_output_node:
+            self.report({'ERROR'}, "World Output node not found")
+            return {'CANCELLED'}
+
+        # 连接 'bg' 节点到 World Output
+        # 假设 'bg' 节点组有一个名为 'Background' 的输出，且 World Output 节点有一个名为 'Surface' 的输入
+        if 'Shader' in bg_node.outputs and 'Surface' in world_output_node.inputs:
+            tree.links.new(bg_node.outputs['Shader'], world_output_node.inputs['Surface'])
+        else:
+            self.report({'ERROR'}, "Correct inputs/outputs not found for linking")
+            return {'CANCELLED'}
+
+        space_data = bpy.context.space_data
+        if space_data and hasattr(space_data, 'shading'):
+            # 根据当前值切换 use_compositor 设置
+            space_data.shading.use_compositor = 'ALWAYS'
+
+        return {'FINISHED'}
+
 
 class OBJECT_OT_COMPOSITION(Operator):
     '''add a COMPOSITION to object'''
@@ -177,39 +296,39 @@ class OBJECT_OT_COMPOSITION(Operator):
     bl_label = "Add Composition"
     bl_options = {'REGISTER', 'UNDO'}
 
+    def execute(self, context):
 
-def execute(self, context):
-    if not context.scene.use_nodes:
-        context.scene.use_nodes = True
+        if not context.scene.use_nodes:
+            context.scene.use_nodes = True
 
-    # 加载 'paper_fx' 节点组
-    with bpy.data.libraries.load(PRESET_FILE_PATH, link=False) as (data_from, data_to):
+        # 加载 'paper_fx' 节点组
+        with bpy.data.libraries.load(PRESET_FILE_PATH, link=False) as (data_from, data_to):
 
-        if "paper_fx" in data_from.node_groups:
-            data_to.node_groups = ["paper_fx"]
-        else:
-            self.report({'WARNING'}, "Paper FX node group not found")
+            if "paper_fx" in data_from.node_groups:
+                data_to.node_groups = ["paper_fx"]
+            else:
+                self.report({'WARNING'}, "Paper FX node group not found")
+                return {'CANCELLED'}
+
+        # 获取合成节点树并添加 'paper_fx' 节点
+        tree = context.scene.node_tree
+        paper_fx_node = tree.nodes.new('CompositorNodeGroup')
+        paper_fx_node.node_tree = bpy.data.node_groups['paper_fx']
+
+        # ... 连接节点的逻辑 ...
+        # 通过节点类型查找 Render Layers 节点和 Composite 节点
+        render_layers_node = next((node for node in tree.nodes if node.type == 'R_LAYERS'), None)
+        composite_node = next((node for node in tree.nodes if node.type == 'COMPOSITE'), None)
+
+        # 如果找不到这些节点，报告错误
+        if not render_layers_node or not composite_node:
+            self.report({'ERROR'}, "Required nodes not found")
             return {'CANCELLED'}
+        # 连接 Render Layers 到 paper_fx，然后连接到 Composite
+        tree.links.new(render_layers_node.outputs[0], paper_fx_node.inputs[0])
+        tree.links.new(paper_fx_node.outputs[0], composite_node.inputs[0])
 
-    # 获取合成节点树并添加 'paper_fx' 节点
-    tree = context.scene.node_tree
-    paper_fx_node = tree.nodes.new('CompositorNodeGroup')
-    paper_fx_node.node_tree = bpy.data.node_groups['paper_fx']
-
-    # ... 连接节点的逻辑 ...
-    # 通过节点类型查找 Render Layers 节点和 Composite 节点
-    render_layers_node = next((node for node in tree.nodes if node.type == 'R_LAYERS'), None)
-    composite_node = next((node for node in tree.nodes if node.type == 'COMPOSITE'), None)
-
-    # 如果找不到这些节点，报告错误
-    if not render_layers_node or not composite_node:
-        self.report({'ERROR'}, "Required nodes not found")
-        return {'CANCELLED'}
-    # 连接 Render Layers 到 paper_fx，然后连接到 Composite
-    tree.links.new(render_layers_node.outputs[0], paper_fx_node.inputs[0])
-    tree.links.new(paper_fx_node.outputs[0], composite_node.inputs[0])
-
-    return {'FINISHED'}
+        return {'FINISHED'}
 
 
 class VIEW3D_PT_NPRtoolkit(Panel):
@@ -221,11 +340,15 @@ class VIEW3D_PT_NPRtoolkit(Panel):
 
     def draw(self, context):
         layout = self.layout
+        layout.label(text="Test")
         layout.operator("mesh.add_object")
-        layout.operator("object.outline")
-        layout.operator("object.shader")
-        layout.operator("object.composition")
+        layout.label(text="Render")
         layout.operator("object.add_solidify_modifier")
+        layout.operator("object.outline")
+        layout.operator("object.add_shader_node")
+        layout.label(text="Compositing")
+        layout.operator("object.composition")
+        layout.operator("object.load_bg_fx")
 
 def register():
     bpy.utils.register_class(OBJECT_OT_add_object)
@@ -234,6 +357,8 @@ def register():
     bpy.utils.register_class(OBJECT_OT_SHADER)
     bpy.utils.register_class(OBJECT_OT_COMPOSITION)
     bpy.utils.register_class(OBJECT_OT_add_solidify)
+    bpy.utils.register_class(OBJECT_OT_load_bg_fx)
+    bpy.utils.register_class(OBJECT_OT_add_shader)
 
 
 
@@ -244,7 +369,8 @@ def unregister():
     bpy.utils.register_class(OBJECT_OT_SHADER)
     bpy.utils.register_class(OBJECT_OT_COMPOSITION)
     bpy.utils.register_class(OBJECT_OT_add_solidify)
-
+    bpy.utils.register_class(OBJECT_OT_load_bg_fx)
+    bpy.utils.unregister_class(OBJECT_OT_add_shader)
 
 if __name__ == "__main__":
     register()
