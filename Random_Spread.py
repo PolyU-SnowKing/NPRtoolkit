@@ -1,12 +1,6 @@
 import bpy
 import random
 
-bl_info = {
-    "name": "Random Object Placer with Adjustable UI",
-    "blender": (2, 80, 0),
-    "category": "Object",
-}
-
 #Random Spread Objects
 class OBJECT_OT_random_place(bpy.types.Operator):
     """Randomly place objects in a defined range"""
